@@ -1,0 +1,19 @@
+{
+  "camera_id": "cam-counter-overhead-001",
+  "rtsp_url": "rtsp://USER:PASS@192.168.1.50:554/Streaming/Channels/101",
+  "counter_polygon": [
+    [0.20, 0.55],
+    [0.80, 0.55],
+    [0.80, 0.95],
+    [0.20, 0.95]
+  ],
+  "business_hours": {
+    "mon": {"open":"09:00","close":"21:00","closed":false},
+    "tue": {"open":"09:00","close":"21:00","closed":false},
+    "wed": {"open":"09:00","close":"21:00","closed":false},
+    "thu": {"open":"09:00","close":"21:00","closed":false},
+    "fri": {"open":"09:00","close":"22:00","closed":false},
+    "sat": {"open":"10:00","close":"22:00","closed":false},
+    "sun": {"open":"11:00","close":"20:00","closed":false}
+  }
+}
