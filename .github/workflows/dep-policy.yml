@@ -1,0 +1,53 @@
+name: dep-policy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check-banned:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Block banned ML libraries (privacy contract)
+        run: |
+          set -e
+          BANNED='face_recognition|dlib|whisper|vosk|deepspeech|speech_recognition|insightface|deepface'
+          FAIL=0
+
+          # requirements.txt files
+          while IFS= read -r f; do
+            echo "Scanning $f"
+            if grep -E -i "^[[:space:]]*($BANNED)([[:space:]<>=!~]|$)" "$f"; then
+              echo "::error file=$f::banned dependency present"
+              FAIL=1
+            fi
+          done < <(find . -name requirements.txt -not -path '*/node_modules/*' -not -path '*/.git/*')
+
+          # pyproject.toml / poetry / uv
+          while IFS= read -r f; do
+            echo "Scanning $f"
+            if grep -E -i "($BANNED)" "$f" >/dev/null 2>&1; then
+              echo "::error file=$f::banned dependency present"
+              FAIL=1
+            fi
+          done < <(find . \( -name pyproject.toml -o -name Pipfile -o -name uv.lock -o -name poetry.lock \) -not -path '*/node_modules/*' -not -path '*/.git/*')
+
+          # Python source imports
+          while IFS= read -r f; do
+            if grep -E "^(from|import)\s+($BANNED)(\.|\s|$)" "$f" >/dev/null 2>&1; then
+              echo "::error file=$f::banned import present"
+              FAIL=1
+            fi
+          done < <(find . -name '*.py' -not -path '*/.venv/*' -not -path '*/node_modules/*' -not -path '*/.git/*')
+
+          if [ "$FAIL" = "1" ]; then
+            echo "Privacy contract violated. See docs/PRIVACY_RULES.md."
+            exit 1
+          fi
+          echo "OK — no banned libraries detected."
+
+      - name: Sanity check sanitizer banned-words file exists
+        run: test -f apps/api/app/util/sanitizer.py
