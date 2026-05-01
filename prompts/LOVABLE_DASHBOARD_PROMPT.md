@@ -95,7 +95,7 @@ red button (double-confirm).
 
 /settings/team — tabs: Users / Profile / Billing / Privacy & Data. Users
 tab: list with role + invite button. Billing tab: shows current plan
-("Starter — $299/month, 12-month rate lock active until [today + 365 days]"),
+("Starter — $299/month, 12-month rate lock active until April 30, 2027"),
 upgrade buttons (Pro $399/mo, Advanced $499/mo), payment method, invoice history.
 
 /settings/audit — audit log table. Filters: All / Audio / Clip access /
@@ -126,7 +126,7 @@ DESIGN RULES
 MOCK STORE
 Brownwood Mart, 123 Main St, Brownwood TX, America/Chicago. Mon–Thu
 09:00–21:00, Fri 09:00–22:00, Sat 10:00–22:00, Sun 11:00–20:00. Plan:
-Starter $299/mo, rate locked through [today + 365 days].
+Starter $299/mo, rate locked through April 30, 2027.
 
 MOCK CAMERAS
 1. Counter Overhead — counter, online, audio supported, audio OFF.

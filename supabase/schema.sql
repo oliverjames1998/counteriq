@@ -1,5 +1,6 @@
--- CounterIQ — Postgres schema (run on Supabase project)
--- Idempotent where reasonable. Run once on a fresh project.
+-- CounterIQ — Postgres schema (clean install, no destructive ops)
+-- Run on a fresh Supabase project. Tables ordered so all FKs resolve
+-- inline. No DROP, no ALTER ADD CONSTRAINT.
 
 create extension if not exists "uuid-ossp";
 create extension if not exists "pgcrypto";
@@ -46,7 +47,7 @@ create table if not exists stores (
 create index if not exists idx_stores_owner on stores(owner_id);
 
 -- ============================================================
--- STORE_USERS (membership / RBAC)
+-- STORE_USERS
 -- ============================================================
 create table if not exists store_users (
   store_id uuid not null references stores(id) on delete cascade,
@@ -100,7 +101,47 @@ create table if not exists zones (
 create index if not exists idx_zones_camera on zones(camera_id);
 
 -- ============================================================
--- EVENTS
+-- POS_INTEGRATIONS (before events so FK resolves inline)
+-- ============================================================
+create table if not exists pos_integrations (
+  id uuid primary key default gen_random_uuid(),
+  store_id uuid not null references stores(id) on delete cascade,
+  vendor text not null check (vendor in ('clover','square','lightspeed','shopify','korona')),
+  status text not null default 'connecting'
+    check (status in ('connecting','active','paused','error')),
+  oauth_credentials_encrypted text,
+  webhook_secret_hash text,
+  last_sync_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+-- ============================================================
+-- POS_TRANSACTIONS (before events so FK resolves inline)
+-- ============================================================
+create table if not exists pos_transactions (
+  id uuid primary key default gen_random_uuid(),
+  store_id uuid not null references stores(id) on delete cascade,
+  pos_integration_id uuid not null references pos_integrations(id) on delete cascade,
+  vendor_transaction_id text not null,
+  started_at timestamptz not null,
+  ended_at timestamptz,
+  total_cents int,
+  tender_type text,
+  register_id text,
+  employee_id_external text,
+  line_items jsonb not null default '[]',
+  voided boolean not null default false,
+  refunded boolean not null default false,
+  no_sale boolean not null default false,
+  manual_price_entry boolean not null default false,
+  discount_total_cents int not null default 0,
+  raw_payload jsonb not null default '{}',
+  unique (pos_integration_id, vendor_transaction_id)
+);
+create index if not exists idx_pos_tx_store_time on pos_transactions(store_id, started_at desc);
+
+-- ============================================================
+-- EVENTS (FK to pos_transactions resolves cleanly now)
 -- ============================================================
 create table if not exists events (
   id uuid primary key default gen_random_uuid(),
@@ -121,7 +162,7 @@ create table if not exists events (
   resolved_by uuid references users(id),
   resolved_at timestamptz,
   linked_event_id uuid references events(id) on delete set null,
-  pos_transaction_id uuid,
+  pos_transaction_id uuid references pos_transactions(id) on delete set null,
   pos_match_status text default 'not_applicable'
     check (pos_match_status in
            ('matched','no_match','pending','not_applicable','unknown_no_pos')),
@@ -274,7 +315,22 @@ create table if not exists audio_compliance_confirmations (
 );
 create index if not exists idx_audio_compl_store on audio_compliance_confirmations(store_id, confirmed_at desc);
 
--- Trigger: enabling audio requires fresh compliance row + audio_policy_confirmed
+-- ============================================================
+-- POS_EVENTS
+-- ============================================================
+create table if not exists pos_events (
+  id uuid primary key default gen_random_uuid(),
+  store_id uuid not null references stores(id) on delete cascade,
+  pos_transaction_id uuid references pos_transactions(id) on delete cascade,
+  type text not null,
+  flagged_at timestamptz not null default now(),
+  metadata jsonb not null default '{}',
+  linked_event_id uuid references events(id) on delete set null
+);
+
+-- ============================================================
+-- AUDIO ENABLE TRIGGER
+-- ============================================================
 create or replace function check_audio_enable_requires_compliance()
 returns trigger language plpgsql as $$
 begin
@@ -291,62 +347,6 @@ begin
   return NEW;
 end$$;
 
-drop trigger if exists cameras_audio_enable_check on cameras;
 create trigger cameras_audio_enable_check
   before update on cameras
   for each row execute function check_audio_enable_requires_compliance();
-
--- ============================================================
--- POS (post-MVP, schema-ready now)
--- ============================================================
-create table if not exists pos_integrations (
-  id uuid primary key default gen_random_uuid(),
-  store_id uuid not null references stores(id) on delete cascade,
-  vendor text not null check (vendor in ('clover','square','lightspeed','shopify','korona')),
-  status text not null default 'connecting'
-    check (status in ('connecting','active','paused','error')),
-  oauth_credentials_encrypted text,
-  webhook_secret_hash text,
-  last_sync_at timestamptz,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists pos_transactions (
-  id uuid primary key default gen_random_uuid(),
-  store_id uuid not null references stores(id) on delete cascade,
-  pos_integration_id uuid not null references pos_integrations(id) on delete cascade,
-  vendor_transaction_id text not null,
-  started_at timestamptz not null,
-  ended_at timestamptz,
-  total_cents int,
-  tender_type text,
-  register_id text,
-  employee_id_external text,
-  line_items jsonb not null default '[]',
-  voided boolean not null default false,
-  refunded boolean not null default false,
-  no_sale boolean not null default false,
-  manual_price_entry boolean not null default false,
-  discount_total_cents int not null default 0,
-  raw_payload jsonb not null default '{}',
-  unique (pos_integration_id, vendor_transaction_id)
-);
-create index if not exists idx_pos_tx_store_time on pos_transactions(store_id, started_at desc);
-
-create table if not exists pos_events (
-  id uuid primary key default gen_random_uuid(),
-  store_id uuid not null references stores(id) on delete cascade,
-  pos_transaction_id uuid references pos_transactions(id) on delete cascade,
-  type text not null,
-  flagged_at timestamptz not null default now(),
-  metadata jsonb not null default '{}',
-  linked_event_id uuid references events(id) on delete set null
-);
-
--- FK from events.pos_transaction_id once pos_transactions exists
-do $$ begin
-  alter table events
-    add constraint fk_events_pos_tx
-    foreign key (pos_transaction_id) references pos_transactions(id) on delete set null;
-exception when duplicate_object then null;
-end $$;
