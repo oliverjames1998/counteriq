@@ -1,11 +1,10 @@
 # CounterIQ — Live Project Status
 
-**Last updated:** 2026-05-02
+**Last updated:** 2026-05-02 (NVR IP captured)
 
 ## TL;DR — what's done, what's next
 
-- ✅ **Backend (FastAPI)** — code complete, 15/15 tests pass. Ready to deploy.
-  Not yet deployed to Fly.io.
+- ✅ **Backend (FastAPI)** — code complete, 15/15 tests pass. **Not yet deployed.**
 - ✅ **Database** — single Supabase (`ejriamgpvxrslfqsxkjp`, Lovable Cloud).
   17 tables, RLS, RPCs (`claim_edge_device`, `ingest_edge_events`).
 - ✅ **Dashboard** — live at https://app.counteriq.us. Signup, auth, camera
@@ -22,26 +21,55 @@
 
 | Item | State |
 |---|---|
-| Cameras + LTS NVR | Already installed by dealer. Static IP on `192.168.4.X`. |
-| **NVR local IP** | ⚠️ **OUTSTANDING** — need this before edge install can proceed |
-| Edge box | iMac at the store. Retina 4K 21.5" 2019, Intel i3, 8 GB, Sonoma 14.2.1 |
-| Backend deployed to Fly.io | Not yet — needs `fly auth login` (one-time) |
-| Edge agent installed | Not yet — blocked on NVR IP and backend deploy |
+| Cameras + LTS NVR | Already installed by dealer. Static IP. |
+| **NVR local IP** | ✅ **`192.168.4.23`** (confirmed 2026-05-02) |
+| Network layout | Router `192.168.4.1` · iMac `192.168.4.22` · NVR `192.168.4.23` |
+| WiFi SSID | `Vapor Planet` |
+| Edge box (TEMPORARY, weeks 1–4) | iMac at the store. Retina 4K 21.5" 2019, Intel i3 4-core 3.6 GHz, 8 GB, Sonoma 14.2.1. **CPU-only inference.** Realistic capacity: 1–2 cameras at sub-stream resolution. |
+| Edge box (production, week 4+) | TBD — likely Beelink Mini PC N100 (~$200) OR Jetson Orin Nano 8GB (~$499). iMac will be retired/repurposed. |
+| Backend deployed to Fly.io | ⏳ Not yet — needs `fly auth login` (one-time) |
+| Edge agent installed | ⏳ Not yet — RTSP test + Phase A→F of macOS runbook still to do |
+
+## Pilot phase week-by-week
+
+| Week | Goal |
+|---|---|
+| 1 (now) | Install runs end-to-end. First counter_unattended event lands on dashboard. Daily report email arrives at 6 AM next day. |
+| 2 | Watch real footage. Adjust `EMPTY_THRESHOLD_S`, `counter_polygon`, `business_hours`. Goal: ≤ 1 false positive/day. |
+| 3 | Demo to store team. Capture feedback on daily report content. |
+| 4 | Order production hardware (Beelink N100 ~$200 or Jetson Orin Nano ~$499). Swap iMac → mini PC at the store. |
+| 5+ | Scale to second store, then external paid pilots. |
 
 ## Resume prompt for any new Claude session
 
-If you're starting a fresh Claude conversation (different machine, new
-session, etc.), paste this to bootstrap context fast:
+Paste this into a fresh Claude conversation to bootstrap context fast:
 
 ```
-I'm continuing the CounterIQ install at the Vapor Planet vape shop. Repo:
-https://github.com/oliverjames1998/counteriq. Read STATUS.md and docs/INSTALL_RUNBOOK_MACOS.md
-for context. The pilot edge box is an iMac (Retina 4K 21.5" 2019, Intel i3,
-Sonoma 14.2.1). The store WiFi is "Vapor Planet" on 192.168.4.0/24. The LTS
-NVR has device serial FG5757437 and a static IP somewhere on 192.168.4.X.
-Backend is already coded but not deployed; dashboard is live at
-app.counteriq.us. Continue from where I am: I need to find the NVR's local
-IP and get the edge agent running on the iMac.
+I'm continuing the CounterIQ install at the Vapor Planet vape shop. Repo
+is PUBLIC at https://github.com/oliverjames1998/counteriq. Read STATUS.md
+and docs/INSTALL_RUNBOOK_MACOS.md for full context.
+
+Key facts:
+- Edge box: iMac at the store (Retina 4K 21.5" 2019, Intel i3, Sonoma 14.2.1).
+  Temporary for proof-of-concept; will swap to mini PC or Jetson at week 4+.
+- Network: Vapor Planet WiFi, 192.168.4.0/24. iMac = .22, router = .1,
+  NVR = .23 (confirmed). LTS NVR cloud serial = FG5757437.
+- Backend (apps/api/) coded but NOT deployed to Fly.io yet.
+- Dashboard live at app.counteriq.us. Database is Lovable Cloud Supabase
+  (ref ejriamgpvxrslfqsxkjp). Anon-key + JWT pass-through architecture, no
+  service-role key needed.
+
+Next steps in order:
+1. RTSP test from iMac Terminal:
+   ffmpeg -an -rtsp_transport tcp -i "rtsp://USER:PASS@192.168.4.23:554/Streaming/Channels/102" -frames:v 1 -y /tmp/probe.jpg && open /tmp/probe.jpg
+2. Phase A of INSTALL_RUNBOOK_MACOS.md — fly auth login + fly deploy.
+3. Phase B — INSERT into edge_devices in Supabase SQL editor, copy pairing_token.
+4. Phase D — configure /etc/counteriq/config.json with NVR IP, RTSP URL, pairing_token.
+5. Phase E — run agent foreground, verify "paired" log line + dashboard online.
+6. Phase F — install launchd plist for unattended 24/7 operation.
+
+I'm at the iMac in Terminal. Walk me through the next blocker. macOS only —
+no systemd or apt commands.
 ```
 
 ## Phase log
@@ -49,20 +77,17 @@ IP and get the edge agent running on the iMac.
 - **Phase 1–3** (pre-build): pricing locked, privacy contract written, schema designed.
 - **Phase 4A** (2026-05-01): GitHub repo created, pushed.
 - **Phase 4B** (2026-05-01): Supabase schema applied, verified.
-- **Phase 4C** (2026-05-01): FastAPI scaffolded with privacy-by-design endpoints. 15/15 tests pass.
+- **Phase 4C** (2026-05-01): FastAPI scaffolded. 15/15 tests pass.
 - **Phase 4D** (2026-05-01): Lovable dashboard wired to Supabase. Signup persists. Zones edit + persist.
 - **Custom domain** (2026-05-01): app.counteriq.us live with auto-Cloudflare DNS.
-- **Phase 5+6** (2026-05-02): Schema consolidated to one Supabase, FastAPI refactored to anon+JWT pass-through, edge agent written, Fly.io config + macOS runbook.
+- **Phase 5+6** (2026-05-02): Schema consolidated, FastAPI refactored to anon+JWT pass-through, edge agent written, Fly.io config + macOS runbook.
 - **Phase 7 (in progress)**: First-store install at Vapor Planet vape shop.
+  - 2026-05-02: NVR IP found at `192.168.4.23`. Next: RTSP test, then deploy + pair.
 
-## Single biggest unblock right now
+## Post-install cleanup (after pilot is verified running)
 
-**Find the NVR's local IP on the Vapor Planet WiFi.** Three ways:
-
-1. **LTS Connect mobile app** → tap device (FG5757437) → settings → IP
-2. **Browser to `http://192.168.4.1`** → Connected Devices → "Hikvision"
-3. **HDMI display on NVR** → right-click → Menu → Configuration → Network
-
-Once the IP is known, Phase A (Fly.io deploy) + Phase B (provision device row)
-+ Phase D (configure cameras) + Phase E (first boot) of `INSTALL_RUNBOOK_MACOS.md`
-take ~60 minutes total to complete the pilot install.
+- [ ] `gh repo edit oliverjames1998/counteriq --visibility private --accept-visibility-change-consequences`
+- [ ] Verify launchd auto-restart after iMac reboot
+- [ ] Confirm 6 AM daily report email arrives
+- [ ] Add missing tables to Lovable Supabase (pos_*, audio_compliance_confirmations) if pursuing Phase 2
+- [ ] Set up Cloudflare R2 bucket + wire clip upload (currently event metadata only)
