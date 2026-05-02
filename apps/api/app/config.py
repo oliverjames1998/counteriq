@@ -7,8 +7,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env.local", extra="ignore")
 
     SUPABASE_URL: str
-    SUPABASE_PUBLISHABLE_KEY: str = ""
-    SUPABASE_SECRET_KEY: str
+    SUPABASE_PUBLISHABLE_KEY: str
+    # Service-role key is intentionally optional. Lovable Cloud doesn't expose
+    # one, and the architecture instead uses anon key + JWT pass-through + RLS.
+    SUPABASE_SECRET_KEY: str = ""
 
     EDGE_KEY_PEPPER: str = "dev-pepper-replace-me"
     DEV_MOCK_AUTH: bool = Field(default=False)

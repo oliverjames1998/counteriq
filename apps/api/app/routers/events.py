@@ -1,12 +1,11 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..auth import CurrentUser, require_user
-from ..db import admin_client
+from ..db import user_get
 from ..models import EventOut
-from .stores import _user_can_access_store
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 
@@ -23,22 +22,26 @@ def list_events(
     limit: int = Query(default=50, ge=1, le=200),
     user: CurrentUser = Depends(require_user),
 ) -> list[EventOut]:
-    if not _user_can_access_store(user.id, store_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="not a member of this store")
-
-    q = admin_client().table("events").select("*").eq("store_id", store_id)
+    params: dict[str, str] = {
+        "store_id": f"eq.{store_id}",
+        "select": "*",
+        "order": "started_at.desc",
+        "limit": str(limit),
+    }
     if type:
-        q = q.eq("type", type)
+        params["type"] = f"eq.{type}"
     if status_filter:
-        q = q.eq("status", status_filter)
+        params["status"] = f"eq.{status_filter}"
     if media_type:
-        q = q.eq("media_type", media_type)
+        params["media_type"] = f"eq.{media_type}"
     if camera_id:
-        q = q.eq("camera_id", camera_id)
+        params["camera_id"] = f"eq.{camera_id}"
     if from_:
-        q = q.gte("started_at", from_.isoformat())
+        params["started_at"] = f"gte.{from_.isoformat()}"
     if to:
-        q = q.lte("started_at", to.isoformat())
+        params.setdefault("started_at", f"lte.{to.isoformat()}")
 
-    res = q.order("started_at", desc=True).limit(limit).execute()
-    return [EventOut(**row) for row in (res.data or [])]
+    r = user_get("events", user.jwt, params=params)
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+    return [EventOut(**row) for row in r.json()]

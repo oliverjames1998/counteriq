@@ -22,6 +22,7 @@ class CurrentUser:
     id: str
     email: Optional[str]
     role: str
+    jwt: str  # raw bearer token, forwarded to PostgREST so RLS scopes data
 
 
 _JWKS_CACHE: dict = {"fetched_at": 0, "keys": None}
@@ -75,11 +76,17 @@ def require_user(
     token = authorization.split(" ", 1)[1].strip()
 
     if settings.DEV_MOCK_AUTH and token == "mock":
-        return CurrentUser(id="00000000-0000-0000-0000-000000000001", email="dev@counteriq.local", role="authenticated")
+        return CurrentUser(
+            id="00000000-0000-0000-0000-000000000001",
+            email="dev@counteriq.local",
+            role="authenticated",
+            jwt=token,
+        )
 
     payload = _verify_supabase_jwt(token, settings)
     return CurrentUser(
         id=payload.get("sub", ""),
         email=payload.get("email"),
         role=payload.get("role", "authenticated"),
+        jwt=token,
     )

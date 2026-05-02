@@ -1,25 +1,18 @@
-"""Cameras: RTSP probe + create.
-
-RTSP credentials are encrypted at rest with pgcrypto + a per-store key.
-We invoke `crypt_using_pgcrypto()` via a Postgres RPC named `encrypt_rtsp_url`
-that the schema migration provides. Until that RPC is wired, we store the
-URL verbatim in the encrypted column as a placeholder — TODO before pilot.
-"""
+"""Cameras router. JWT pass-through; RLS controls access."""
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from ..auth import CurrentUser, require_user
-from ..db import admin_client
+from ..db import user_post
 from ..models import CameraCreate, CameraOut, CameraTestRequest, CameraTestResponse
 from ..util.rtsp_probe import probe_rtsp
-from .stores import _user_can_access_store
 
 router = APIRouter(prefix="/api/cameras", tags=["cameras"])
 
 
 @router.post("/test", response_model=CameraTestResponse)
 def test_camera(payload: CameraTestRequest, user: CurrentUser = Depends(require_user)) -> CameraTestResponse:
-    """Probe an RTSP URL. Audio is never opened (-an enforced in probe_rtsp).
-    Returns one still frame as base64 plus audio_supported (informational)."""
+    """Probe an RTSP URL. ffmpeg is invoked with `-an` (audio disabled),
+    enforced inside util/rtsp_probe.probe_rtsp."""
     result = probe_rtsp(payload.rtsp_url)
     return CameraTestResponse(
         ok=result.ok,
@@ -32,22 +25,18 @@ def test_camera(payload: CameraTestRequest, user: CurrentUser = Depends(require_
 
 @router.post("", response_model=CameraOut, status_code=status.HTTP_201_CREATED)
 def create_camera(payload: CameraCreate, user: CurrentUser = Depends(require_user)) -> CameraOut:
-    if not _user_can_access_store(user.id, payload.store_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="not a member of this store")
-
-    res = (
-        admin_client()
-        .table("cameras")
-        .insert(
-            {
-                "store_id": payload.store_id,
-                "label": payload.label,
-                "location": payload.location,
-                "rtsp_url_encrypted": payload.rtsp_url,
-            }
-        )
-        .execute()
-    )
-    if not res.data:
-        raise HTTPException(status_code=500, detail="failed to create camera")
-    return CameraOut(**res.data[0])
+    body = {
+        "store_id": payload.store_id,
+        "label": payload.label,
+        "location": payload.location,
+        # NOTE: rtsp_url stored as-is in this scaffold. Production: pgcrypto
+        # column-level encryption via a dedicated `set_camera_rtsp` RPC.
+        "rtsp_url_encrypted": payload.rtsp_url,
+    }
+    r = user_post("cameras", user.jwt, body)
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+    rows = r.json()
+    if not rows:
+        raise HTTPException(status_code=500, detail="camera insert returned no rows")
+    return CameraOut(**rows[0])

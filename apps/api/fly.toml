@@ -1,0 +1,37 @@
+app = "counteriq-api"
+primary_region = "dfw"            # Dallas — close to your Texas pilot store
+kill_signal = "SIGINT"
+kill_timeout = "30s"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8000"
+  PYTHONUNBUFFERED = "1"
+  SUPABASE_URL = "https://ejriamgpvxrslfqsxkjp.supabase.co"
+  # Public key — safe to embed; RLS protects data.
+  SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqcmlhbWdwdnhyc2xmcXN4a2pwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2NzMwNDgsImV4cCI6MjA5MzI0OTA0OH0.d7BJo3ECp4nfmEQug3uSXrT2z6UmMKDJjCU_K7ho4bE"
+  DEV_MOCK_AUTH = "false"
+  # EDGE_KEY_PEPPER set via `fly secrets set EDGE_KEY_PEPPER=...`
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

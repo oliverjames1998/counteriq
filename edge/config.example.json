@@ -1,19 +1,28 @@
 {
-  "camera_id": "cam-counter-overhead-001",
-  "rtsp_url": "rtsp://USER:PASS@192.168.1.50:554/Streaming/Channels/101",
-  "counter_polygon": [
-    [0.20, 0.55],
-    [0.80, 0.55],
-    [0.80, 0.95],
-    [0.20, 0.95]
-  ],
+  "api_base_url": "https://counteriq-api.fly.dev",
+  "pairing_token": "REPLACE_WITH_TOKEN_FROM_SUPABASE_SQL_EDITOR",
+  "api_key_file": "./api_key.txt",
+  "state_db": "./events.sqlite",
+  "sim_mode": false,
+  "sim_source": "0",
+  "heartbeat_interval_s": 30,
+  "sync_interval_s": 10,
   "business_hours": {
-    "mon": {"open":"09:00","close":"21:00","closed":false},
-    "tue": {"open":"09:00","close":"21:00","closed":false},
-    "wed": {"open":"09:00","close":"21:00","closed":false},
-    "thu": {"open":"09:00","close":"21:00","closed":false},
-    "fri": {"open":"09:00","close":"22:00","closed":false},
-    "sat": {"open":"10:00","close":"22:00","closed":false},
-    "sun": {"open":"11:00","close":"20:00","closed":false}
-  }
+    "mon": { "open": "09:00", "close": "21:00", "closed": false },
+    "tue": { "open": "09:00", "close": "21:00", "closed": false },
+    "wed": { "open": "09:00", "close": "21:00", "closed": false },
+    "thu": { "open": "09:00", "close": "21:00", "closed": false },
+    "fri": { "open": "09:00", "close": "22:00", "closed": false },
+    "sat": { "open": "10:00", "close": "22:00", "closed": false },
+    "sun": { "open": "10:00", "close": "20:00", "closed": false }
+  },
+  "cameras": [
+    {
+      "camera_id": "REPLACE_WITH_CAMERA_UUID_FROM_DASHBOARD",
+      "label": "Counter Overhead",
+      "rtsp_url": "rtsp://USER:PASS@192.168.1.50:554/Streaming/Channels/101",
+      "counter_polygon": [[0.10, 0.55], [0.65, 0.55], [0.65, 0.95], [0.10, 0.95]],
+      "sample_every_n_frames": 6
+    }
+  ]
 }

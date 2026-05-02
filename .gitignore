@@ -20,8 +20,10 @@ env/
 edge/events.sqlite
 edge/clips/
 edge/config.json
+edge/api_key.txt
 edge/models/*.pt
 edge/models/*.engine
+edge/yolov8n.pt
 
 # Env
 .env
