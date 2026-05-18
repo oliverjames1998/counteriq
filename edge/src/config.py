@@ -17,9 +17,25 @@ class CameraCfg(BaseModel):
     camera_id: str
     label: str
     rtsp_url: str
+    role: str = Field(
+        default="counter",
+        description="counter | entrance | shelf | restricted",
+    )
     counter_polygon: list[list[float]] = Field(
         default_factory=list,
         description="List of [x, y] pairs in 0..1 normalized image coordinates",
+    )
+    drawer_polygon: list[list[float]] = Field(
+        default_factory=list,
+        description="Optional cash-drawer polygon for drawer_open detection",
+    )
+    tripwire_line: list[list[float]] = Field(
+        default_factory=list,
+        description="Two normalized [x,y] points defining the entrance tripwire",
+    )
+    tripwire_inside_side: str = Field(
+        default="below",
+        description="above|below|left|right — which side of the tripwire is INSIDE the store",
     )
     sample_every_n_frames: int = 6
 

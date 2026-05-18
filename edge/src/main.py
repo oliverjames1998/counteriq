@@ -26,6 +26,7 @@ from pathlib import Path
 
 from .config import EdgeConfig, load_or_pair_api_key
 from .detector import run_camera
+from .entrance_counter import run_entrance_camera
 from .sync import heartbeat_thread, sync_thread
 
 log = logging.getLogger("counteriq.edge")
@@ -63,14 +64,20 @@ def main() -> int:
     threads: list[threading.Thread] = []
 
     for cam in cfg.cameras:
+        role = (getattr(cam, "role", "counter") or "counter").lower()
+        if role == "entrance":
+            target_fn = run_entrance_camera
+        else:
+            target_fn = run_camera
         t = threading.Thread(
-            target=run_camera,
-            name=f"cam-{cam.camera_id}",
+            target=target_fn,
+            name=f"cam-{role}-{cam.camera_id}",
             args=(cam, cfg, cfg.state_db, stop_event),
             daemon=True,
         )
         t.start()
         threads.append(t)
+        log.info("started %s thread for camera %s (%s)", role, cam.label, cam.camera_id)
 
     sync_t = threading.Thread(
         target=sync_thread,
